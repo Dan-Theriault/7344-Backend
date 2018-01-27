@@ -30,6 +30,9 @@
           url="git@github.com:Dan-Theriault/7344-Backend.git"; 
         };
         propogatedBuildInputs = myPython;
+        preInstallPhase = ''
+          cd src
+        '';
       };
     in
     {
