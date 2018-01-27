@@ -92,7 +92,7 @@ def logout():
 
 
 def check_token(token):
-    from .models import Token
+    from ESSBackend.models import Token
 
     # TODO: Token expiry?
 
