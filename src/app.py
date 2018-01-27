@@ -3,7 +3,7 @@
 # - https://blog.miguelgrinberg.com/post/designing-a-restful-api-with-python-and-flask
 
 from bcrypt import checkpw, hashpw, gensalt
-from config import Config
+from ESSBackend.config import Config
 from datetime import datetime
 from flask import Flask, abort, jsonify, make_response, request
 from flask_sqlalchemy import SQLAlchemy
@@ -18,7 +18,7 @@ db = SQLAlchemy(app)
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    from models import AppUser, Token
+    from ESSBackend.models import AppUser, Token
     if not request.json:
         abort(400)
     if 'email' not in request.json or 'password' not in request.json:
@@ -52,7 +52,7 @@ def login():
 
 @app.route('/api/register', methods=['POST'])
 def register():
-    from models import AppUser
+    from ESSBackend.models import AppUser
     if not request.json:
         abort(400)
     if 'email' not in request.json or 'password' not in request.json:
@@ -75,7 +75,7 @@ def register():
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
-    from models import Token
+    from ESSBackend.models import Token
     if not request.json:
         abort(400)
     if 'token' not in request.json:
@@ -92,7 +92,7 @@ def logout():
 
 
 def check_token(token):
-    from models import Token
+    from .models import Token
 
     # TODO: Token expiry?
 
