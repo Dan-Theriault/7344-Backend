@@ -1,7 +1,4 @@
 # AUTHOR: Daniel Theriault
-# DATE: 2018-01-16
-# REV: 1
-
 # This is a NixOps configuration file.
 # It specifies a server configuration, which NixOps can then deploy to arbitrary backends (physical hosts, VMs, AWS instances, etc.)
 
@@ -25,24 +22,14 @@
         ];
       };
 
-      backend = pkgs.stdenv.mkDerivation {
-        name = "7144Backend-0.1";
-
-        src = ./src;
-
-        buildInputs = [
-          myPython
-        ];
-
-        doCheck = false;
-
-        installPhase = ''
-          cp -r . $out/
-        '';
-
-        meta = {
-          platforms = pkgs.stdenv.lib.platforms.linux;
+      ESSBackend = pkgs.python3Packages.buildPythonApplication rec {
+        pname = "ESSBackend";
+        version = "0.1";
+        name = "${pname}-${version}";
+        src = pkgs.fetchgitPrivate {
+          url="git@github.com:Dan-Theriault/7344-Backend.git"; 
         };
+        propogatedBuildInputs = myPython;
       };
     in
     {
@@ -51,7 +38,7 @@
         initialScript = builtins.toFile "psql-init.sh" ''
           CREATE DATABASE design_dev;
           CREATE USER root;
-          CREATE USER gt7344;
+          CREATE USER essb;
         '';
         authentication = ''
           local all all                trust
@@ -61,23 +48,24 @@
         '';
       };
 
-      environment.systemPackages = [
-        myPython
-        backend 
-      ];
-
-     systemd.services.projectBackend = {
-        description = "GT Junior Design Project Backend Daemon";
-
-        environment = {
+      environment = {
+        systemPackages = [
+          myPython
+          ESSBackend 
+        ];
+        variables = {
           DATABASE_URL = "postgresql+psycopg2:///design_dev"; 
         };
+      };
 
-        preStart = "python {backend}/init.py";
+      systemd.services.ESSBackend = {
+        description = "GT Junior Design Project Backend Daemon";
+
+        preStart = "{myPython}/bin/python {backend}/src/init.py";
 
         serviceConfig = {
           Type = "forking";
-          ExecStart = "python {backend}/app.py";
+          ExecStart = "{myPython}/bin/python {backend}/src/app.py";
           Restart = "on-failure";
         };
 
