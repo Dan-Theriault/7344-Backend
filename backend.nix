@@ -57,18 +57,27 @@
         '';
       };
 
-      networking.firewall.allowedTCPPorts = [ 80 8080 ];
+      services.ddclient = {
+        enable = true;
+        domain = "ess.dtheriault.com";
+        server = "dynamicdns.park-your-domain.com";
+        protocol = "namecheap";
+        use = "web, web=dynamicdns.park-your-domain.com/getip";
+        username = "dtheriault.com";
+        password = builtins.readFile ./secrets/dyndns;
+      };
+
+      networking.firewall.allowedTCPPorts = [ 80 ];
+
       services.nginx = {
         enable = true;
         recommendedTlsSettings = true;
         recommendedOptimisation = true;
         recommendedGzipSettings = true;
         recommendedProxySettings = true;
-        # virtualHosts."dtheriault.com" = {
-        #   enableACME = true;
-        #   forceSSL = true;
-        # };
-        virtualHosts."ESSB.dtheriault.com" = {
+        virtualHosts."ess.dtheriault.com" = {
+          enableACME = true;
+          # forceSSL = true;
           locations."/" = {
             extraConfig = ''
               include ${pkgs.nginx}/conf/uwsgi_params;
@@ -77,6 +86,7 @@
           };
         };
       };
+
       services.uwsgi = {
         enable = true;
         plugins = [ "python3" ];
@@ -120,8 +130,8 @@
         };
         before = [ "uwsgi.service" ];
         wantedBy = [ "multi-user.target" ];
-        after = [ "postgres.service" ];
-        requires = [ "postgres.service" ];
+        after = [ "postgresql.service" ];
+        requires = [ "postgresql.service" ];
       };
     };
 }
