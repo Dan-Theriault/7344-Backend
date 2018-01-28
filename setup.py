@@ -1,4 +1,11 @@
-from setuptools import setup
+#!/usr/bin/env python3
+
+from distutils.core import setup
+
+PYTHON_MODULES = [
+    'ESSBackend', 'ESSBackend.app', 'ESSBackend.config', 'ESSBackend.init',
+    'ESSBackend.models'
+]
 
 setup(
     name='ESS Backend',
@@ -6,4 +13,6 @@ setup(
     description='Environmental Sustainability Scorecard Backend',
     author='Daniel Theriault',
     packages=['ESSBackend'],
-    entry_points={'console_scripts': ['ESSBackend = ESSBackend.app:main']}, )
+    # py_modules=PYTHON_MODULES,
+    # entry_points={'console_scripts': ['ESSBackend = ESSBackend.app:main']},
+)
