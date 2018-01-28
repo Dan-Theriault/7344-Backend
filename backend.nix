@@ -67,7 +67,7 @@
         password = builtins.readFile ./secrets/dyndns;
       };
 
-      networking.firewall.allowedTCPPorts = [ 80 ];
+      networking.firewall.allowedTCPPorts = [ 80 443 ];
 
       services.nginx = {
         enable = true;
@@ -77,7 +77,7 @@
         recommendedProxySettings = true;
         virtualHosts."ess.dtheriault.com" = {
           enableACME = true;
-          # forceSSL = true;
+          forceSSL = true;
           locations."/" = {
             extraConfig = ''
               include ${pkgs.nginx}/conf/uwsgi_params;
