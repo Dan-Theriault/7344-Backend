@@ -18,7 +18,7 @@ db = SQLAlchemy(app)
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    from ESSBackend.models import AppUser, Token
+    from ESSBackend.models import AppUser
     if not request.json:
         abort(400)
     if 'email' not in request.json or 'password' not in request.json:
@@ -34,17 +34,12 @@ def login():
         now = datetime.utcnow()
         hmac = hashlib.sha256(
             (str(now) + user.email + app.config['SECRET_KEY']).encode('utf-8'))
-        newToken: Token = Token(
-            email=user.email, created=now, hash=hmac.hexdigest())
-
-        db.session.add(newToken)
-        db.session.commit()
 
         return make_response(
             jsonify({
-                'token': newToken.hash,
-                'email': newToken.email,
-                'created': newToken.created
+                'token': hmac.hexdigest(),
+                'email': user.email,
+                'expiry': now
             }))
     else:
         return make_response(jsonify({'error': 'Incorrect Password'}))
@@ -73,44 +68,16 @@ def register():
     return make_response(jsonify({'Status': 'User Successfully Registered'}))
 
 
-@app.route('/api/logout', methods=['POST'])
-def logout():
-    from ESSBackend.models import Token
-    if not request.json:
-        abort(400)
-    if 'token' not in request.json:
-        abort(400)
-    if not check_token(request.json['token']):
-        return make_response(jsonify({'Error': 'Invalid Token'}))
-    else:
-        Token.query.filter_by(hash=request.json['token']).delete()
-        db.session.commit()
-        return make_response(jsonify({'Status': 'Logged out'}))
-
-
 # ----- Utility Functions
 
 
-def check_token(token):
-    from ESSBackend.models import Token
+def check_token(hash, expiry, email):
+    # TODO: Token expiry
 
-    # TODO: Token expiry?
+    newHash = hashlib.sha256(
+        (created + email + app.config['SECRET_KEY']).encode('utf-8'))
 
-    tokens: List[Token] = [
-        hashlib.sha256((str(token.created) + token.email +
-                        app.config['SECRET_KEY']).encode('utf-8')).hexdigest()
-        for token in Token.query.filter_by(hash=token)
-    ]
-
-    return token in tokens
-
-
-# def require_token(func):
-#     from models import Token
-#     if check_token(token, email):
-#         return make_response(jsonify({'error': 'Invalid Token'}))
-#     else:
-#         return func
+    return hash == newHash
 
 
 # ----- Error Handling
