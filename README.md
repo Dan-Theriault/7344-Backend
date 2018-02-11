@@ -29,15 +29,11 @@ email":"test2","password":"password"}'
 ```
 
 *logout:*
-```
-curl https://ess.dtheriault.com/api/logout -L -H "Content-Type: application/json" -d '{
-"token": "f13727d997239510862167abddb5017f15eb17bfcf60a0a397c0b1d55d2be2f4"}'
-```
-```
-{
-  "Status": "Logged out"
-}
-```
+Logout has been deprecated.
+Token auth actually allows for the server to be _stateless_.
+Whether you're logged in or not is a property of whether you hold a valid token.
+This property is desirable because it simplifies API logic, while retaining security guarantees.
+
 ## Deployment
 
 In the event I am hit by a bus or otherwise incapacitated, you may need to re-deploy this yourselves.

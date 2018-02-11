@@ -15,8 +15,9 @@
         pname = "ESSBackend";
         version = "0.1.1";
         name = "${pname}-${version}";
-        src = pkgs.fetchgitPrivate {
-          url="git@github.com:Dan-Theriault/7344-Backend.git"; 
+        src = builtins.fetchGit {
+          # url="git@github.com:Dan-Theriault/7344-Backend.git"; 
+          url= ./.;
         };
         buildInputs = with pkgs.python3Packages; [
           bcrypt
@@ -39,21 +40,20 @@
           ESSBackend
         ] ++ [ pkgs.uwsgi ];
       };
+      pg = config.services.postgresql;
+      database_name = "ess_prod";
+      database_user = "uwsgi";
     in
     {
       services.postgresql = {
         enable = true;
         initialScript = builtins.toFile "psql-init.sh" ''
-          CREATE USER root WITH SUPERUSER;
-          CREATE USER uwsgi WITH SUPERUSER;
-          CREATE DATABASE design_dev;
-          ALTER DATABASE design_dev OWNER TO uwsgi
-        '';
-        authentication = ''
-          local all all                trust
-          host  all all 127.0.0.1/32   trust
-          host  all all ::1/128        trust
-          host  all all 192.168.1.0/24 trust
+          CREATE USER ${database_user} WITH LOGIN, NOCREATEDB, NOCREATEROLE;
+          CREATE DATABASE ${database_name};
+          ALTER DATABASE ${database_name} OWNER TO ${database_user};
+          \connect ${database_name};
+          ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO ${database_user};
+          GRANT ALL PRIVILEGES ON ALL TABLES TO ${database_user};
         '';
       };
 
@@ -119,11 +119,13 @@
 
       environment = {
         systemPackages = [ myPython ];
-        variables = { DATABASE_URL = "postgresql+psycopg2:///design_dev"; };
+        variables = { DATABASE_URI = "postgresql+psycopg2:///${database_name}"; };
       };
+      systemd.globalEnvironment = { DATABASE_URI = "postgresql+psycopg2:///${database_name}"; };
 
       systemd.services.ESSBackendInit = {
         description = "Initializes the database tables needed by ESSBackend.";
+
         serviceConfig = {
           Type = "oneshot";
           ExecStart = "${myPython}/bin/python ${ESSBackend}/lib/python3.6/site-packages/ESSBackend/init.py";
