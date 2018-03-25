@@ -37,12 +37,20 @@ def login():
 
         return make_response(
             jsonify({
-                'token': hmac.hexdigest(),
-                'email': user.email,
-                'expiry': now
+                'token': {
+                    'hash': hmac.hexdigest(),
+                    'email': user.email,
+                    'expiry': now  # TODO: send actual expiry
+                },
+                'result': True,
+                'message': "Succesful login"
             }))
     else:
-        return make_response(jsonify({'error': 'Incorrect Password'}))
+        return make_response(
+            jsonify({
+                'result': False,
+                'message': 'Incorrect Password'
+            }))
 
 
 @app.route('/api/register', methods=['POST'])
@@ -56,7 +64,11 @@ def register():
     user: AppUser = AppUser.query.filter_by(
         email=request.json['email']).first()
     if user:
-        return make_response(jsonify({'error': 'User already exists'}))
+        return make_response(
+            jsonify({
+                'status': False,
+                'message': 'User already exists'
+            }))
 
     pwhash = (hashpw(request.json['password'].encode('utf-8'),
                      gensalt())).decode('utf-8')
@@ -65,7 +77,27 @@ def register():
     db.session.add(newUser)
     db.session.commit()
 
-    return make_response(jsonify({'Status': 'User Successfully Registered'}))
+    now = datetime.utcnow()
+    hmac = hashlib.sha256(
+        (str(now) + user.email + app.config['SECRET_KEY']).encode('utf-8'))
+
+    return make_response(
+        jsonify({
+            'token': {
+                'hash': hmac.hexdigest(),
+                'email': user.email,
+                'expiry': now  # TODO: send actual expiry
+            },
+            'result': True,
+            'message': 'Succesful registration'
+        }))
+
+def status():
+    return make_response(
+        jsonify({
+            'result':True,
+            'message' 'Server status normal'
+        }))
 
 
 # ----- Utility Functions
