@@ -20,9 +20,17 @@ db = SQLAlchemy(app)
 def login():
     from ESSBackend.models import AppUser
     if not request.json:
-        abort(400)
+        return make_response(
+            jsonify({
+                'status': False,
+                'message': 'Where\'s the JSON?'
+            }))
     if 'email' not in request.json or 'password' not in request.json:
-        abort(400)
+        return make_response(
+            jsonify({
+                'status': False,
+                'message': 'Login requires email and password'
+            }))
 
     user: AppUser = AppUser.query.filter_by(
         email=request.json['email']).first()
@@ -47,7 +55,7 @@ def login():
                     'expiry': now  # TODO: send actual expiry
                 },
                 'result': True,
-                'message': "Succesful login"
+                'message': "Successful login"
             }))
     else:
         return make_response(
@@ -61,9 +69,17 @@ def login():
 def register():
     from ESSBackend.models import AppUser
     if not request.json:
-        abort(400)
+        return make_response(
+            jsonify({
+                'status': False,
+                'message': 'Where\'s the JSON?'
+            }))
     if 'email' not in request.json or 'password' not in request.json:
-        abort(400)
+        return make_response(
+            jsonify({
+                'status': False,
+                'message': 'Registration requires email and password'
+            }))
 
     user: AppUser = AppUser.query.filter_by(
         email=request.json['email']).first()
@@ -106,6 +122,60 @@ def status():
         }))
 
 
+@app.route('/api/food', methods=['GET'])
+def getFood():
+    return make_response(
+        jsonify({
+            'status': False,
+            'message': 'Not Implemented'
+        }))
+
+
+@app.route('/api/food', methods=['POST'])
+def postFood():
+    return make_response(
+        jsonify({
+            'status': False,
+            'message': 'Not Implemented'
+        }))
+
+
+@app.route('/api/commute', methods=['GET'])
+def getCommute():
+    return make_response(
+        jsonify({
+            'status': False,
+            'message': 'Not Implemented'
+        }))
+
+
+@app.route('/api/commute', methods=['POST'])
+def postCommute():
+    return make_response(
+        jsonify({
+            'status': False,
+            'message': 'Not Implemented'
+        }))
+
+
+@app.route('/api/journal', methods=['GET'])
+def getJournal():
+    return make_response(
+        jsonify({
+            'status': False,
+            'message': 'Not Implemented'
+        }))
+
+
+@app.route('/api/journal', methods=['POST'])
+def postJournal():
+    return make_response(
+        jsonify({
+            'status': False,
+            'message': 'Not Implemented'
+        }))
+
+
 # ----- Utility Functions
 
 
@@ -113,7 +183,7 @@ def check_token(hash, expiry, email):
     # TODO: Token expiry
 
     newHash = hashlib.sha256(
-        (created + email + app.config['SECRET_KEY']).encode('utf-8'))
+        (expiry + email + app.config['SECRET_KEY']).encode('utf-8'))
 
     return hash == newHash
 
