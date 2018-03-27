@@ -5,7 +5,7 @@
 from bcrypt import checkpw, hashpw, gensalt
 from ESSBackend.config import Config
 from datetime import datetime
-from flask import Flask, abort, jsonify, make_response, request
+from flask import Flask, jsonify, make_response, request
 from flask_sqlalchemy import SQLAlchemy
 
 import hashlib
