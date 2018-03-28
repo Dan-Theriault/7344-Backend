@@ -48,13 +48,13 @@
       services.postgresql = {
         enable = true;
         initialScript = builtins.toFile "psql-init.sh" ''
-          CREATE USER ${database_user} WITH LOGIN, NOCREATEDB, NOCREATEROLE;
+          CREATE ROLE ${database_user} WITH LOGIN;
           CREATE DATABASE ${database_name};
           ALTER DATABASE ${database_name} OWNER TO ${database_user};
           \connect ${database_name};
           ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO ${database_user};
-          GRANT ALL PRIVILEGES ON ALL TABLES TO ${database_user};
         '';
+          # GRANT ALL PRIVILEGES ON ALL TABLES TO ${database_user};
       };
 
       services.ddclient = {

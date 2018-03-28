@@ -8,8 +8,8 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 class Config(object):
     DEBUG = True
     SECRET_KEY = "Not actually a secret ;_;"
-    # SQLALCHEMY_DATABASE_URI = "postgresql+psycopg2:///design_dev"
     SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URI']
     TOKEN_TIMEOUT = "???"  # set this to a timedelta
+
     # significant performance impact & not needed
     SQLALCHEMY_TRACK_MODIFICATIONS = False
