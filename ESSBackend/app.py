@@ -53,12 +53,15 @@ def register():
     db.session.add(newUser)
     db.session.commit()
 
-    return return_token(user.email)
+    return return_token(newUser.email)
 
 
 @app.route('/api/status', methods=['GET'])
 def status():
     return make_response(jsonify({'result': True, 'message': 'Server status normal'}))
+
+
+# ----- Food Functions
 
 
 @app.route('/api/food', methods=['POST'])
@@ -80,7 +83,8 @@ def getFood():
     from ESSBackend.models import Food
 
     foods = Food.query.filter(
-        db.cast(Food.mealTime, db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d")
+        db.cast(Food.mealTime, db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
+        Food.email == request.json['token']['email']
     ).all()
 
     contentList = [
@@ -150,6 +154,9 @@ def postFood():
         return make_response(jsonify({'result': True, 'message': 'Inserted new food.'}))
 
 
+# ----- Commute Functions
+
+
 @app.route('/api/commute', methods=['POST'])
 def getCommute():
     requirements = [
@@ -169,7 +176,8 @@ def getCommute():
     from ESSBackend.models import Commute
 
     commutes = Commute.query.filter(
-        db.cast(Commute.arrival, db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d")
+        db.cast(Commute.arrival, db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
+        Commute.email == request.json['token']['email']
     ).all()
 
     contentList = [
@@ -259,7 +267,8 @@ def getJournal():
 
     journals = JournalEntry.query.filter(
         db.cast(JournalEntry.created,
-                db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d")
+                db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
+        JournalEntry.email == request.json['token']['email']
     ).all()
 
     contentList = [
@@ -328,6 +337,338 @@ def postJournal():
         return make_response(jsonify({'result': True, 'message': 'Inserted new journal entry.'}))
 
 
+# ----- Water Functions
+@app.route('/api/water', methods=['POST'])
+def getWater():
+    requirements = [
+        ('date', []),
+        ('token', ['hash', 'expiry', 'email']),
+    ]
+
+    req_check = check_requirements(requirements, request)
+    if not req_check[0]:
+        return req_check[1]
+
+    token: Token = request.json['token']
+    tok_check = check_token(token)
+    if not tok_check[0]:
+        return tok_check[1]
+
+    from ESSBackend.models import WaterCups
+
+    water = WaterCups.query.filter(
+        db.cast(WaterCups.date, db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
+        WaterCups.email == request.json['token']['email']
+    ).first()
+
+    if water:
+        waterContent = {'cupsCount': water.count, 'isIncrement': False}
+    else:
+        waterContent = {'cupsCount': 0, 'isIncrement': False}
+
+    return make_response(
+        jsonify(
+            {
+                'result': True,
+                'message': f"Returning water consumption for {request.json['date']}",
+                'content': waterContent
+            }
+        )
+    )
+
+
+@app.route('/api/water/new', methods=['POST'])
+def postWater():
+    requirements = [
+        ('content', ['isIncrement', 'cups']),
+        ('metadata', ['timestamp']),
+        ('token', ['hash', 'expiry', 'email']),
+    ]
+
+    req_check = check_requirements(requirements, request)
+    if not req_check[0]:
+        return req_check[1]
+
+    token: Token = request.json['token']
+    tok_check = check_token(token)
+    if not tok_check[0]:
+        return tok_check[1]
+
+    from ESSBackend.models import WaterCups
+
+    water: WaterCups = WaterCups.query.filter_by(
+        email=request.json['token']['email'],
+        date=request.json['metadata']['timestamp'],  # TODO: timestamp equality
+    ).first()
+
+    if water:
+        if request.json['content']['isIncrement']:
+            water.count += request.json['content']['cups']
+        else:
+            water.count = request.json['content']['cups']
+        db.session.commit()
+        return make_response(jsonify({'result': True, 'message': 'Updated existing water entry.'}))
+    else:
+        newWater: WaterCups = WaterCups(
+            email=request.json['token']['email'],
+            date=request.json['metadata']['timestamp'],
+            count=request.json['content']['cups']
+        )
+        db.session.add(newWater)
+        db.session.commit()
+        return make_response(jsonify({'result': True, 'message': 'Inserted new water entry.'}))
+
+
+# ----- Shower Functions
+@app.route('/api/showers', methods=['POST'])
+def getShower():
+    requirements = [
+        ('date', []),
+        ('token', ['hash', 'expiry', 'email']),
+    ]
+
+    req_check = check_requirements(requirements, request)
+    if not req_check[0]:
+        return req_check[1]
+
+    token: Token = request.json['token']
+    tok_check = check_token(token)
+    if not tok_check[0]:
+        return tok_check[1]
+
+    from ESSBackend.models import ShowerUsage
+
+    shower = ShowerUsage.query.filter(
+        db.cast(ShowerUsage.date, db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
+        ShowerUsage.email == request.json['token']['email']
+    ).first()
+
+    if shower:
+        showerContent = {'minutes': shower.minutes, 'cold': shower.cold}
+    else:
+        showerContent = {'minutes': 0, 'cold': False}
+
+    return make_response(
+        jsonify(
+            {
+                'result': True,
+                'message': f"Returning shower usage for {request.json['date']}",
+                'content': showerContent
+            }
+        )
+    )
+
+
+@app.route('/api/showers/new', methods=['POST'])
+def postShower():
+    requirements = [
+        ('content', ['cold', 'minutes']),
+        ('metadata', ['timestamp']),
+        ('token', ['hash', 'expiry', 'email']),
+    ]
+
+    req_check = check_requirements(requirements, request)
+    if not req_check[0]:
+        return req_check[1]
+
+    token: Token = request.json['token']
+    tok_check = check_token(token)
+    if not tok_check[0]:
+        return tok_check[1]
+
+    from ESSBackend.models import ShowerUsage
+
+    shower: ShowerUsage = ShowerUsage.query.filter_by(
+        email=request.json['token']['email'],
+        date=request.json['metadata']['timestamp'],  # TODO: timestamp equality
+    ).first()
+
+    if shower:
+        shower.minutes = request.json['content']['minutes']
+        shower.cold = request.json['content']['cold']
+        db.session.commit()
+        return make_response(jsonify({'result': True, 'message': 'Updated existing shower entry.'}))
+    else:
+        newShower: ShowerUsage = ShowerUsage(
+            email=request.json['token']['email'],
+            date=request.json['metadata']['timestamp'],
+            minutes=request.json['content']['minutes'],
+            cold=request.json['content']['cold']
+        )
+        db.session.add(newShower)
+        db.session.commit()
+        return make_response(jsonify({'result': True, 'message': 'Inserted new shower entry.'}))
+
+
+# ----- Entertainment Functions
+@app.route('/api/entertainment', methods=['POST'])
+def getEntertainment():
+    requirements = [
+        ('date', []),
+        ('token', ['hash', 'expiry', 'email']),
+    ]
+
+    req_check = check_requirements(requirements, request)
+    if not req_check[0]:
+        return req_check[1]
+
+    token: Token = request.json['token']
+    tok_check = check_token(token)
+    if not tok_check[0]:
+        return tok_check[1]
+
+    from ESSBackend.models import EntertainmentUsage
+
+    entertainment = EntertainmentUsage.query.filter(
+        db.cast(EntertainmentUsage.date,
+                db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
+        EntertainmentUsage.email == request.json['token']['email']
+    ).first()
+
+    if entertainment:
+        entertainmentContent = {'hours': entertainment.hours}
+    else:
+        entertainmentContent = {'hours': 0}
+
+    return make_response(
+        jsonify(
+            {
+                'result': True,
+                'message': f"Returning entertainment usage for {request.json['date']}",
+                'content': entertainmentContent
+            }
+        )
+    )
+
+
+@app.route('/api/entertainment/new', methods=['POST'])
+def postEntertainment():
+    requirements = [
+        ('content', ['hours']),
+        ('metadata', ['timestamp']),
+        ('token', ['hash', 'expiry', 'email']),
+    ]
+
+    req_check = check_requirements(requirements, request)
+    if not req_check[0]:
+        return req_check[1]
+
+    token: Token = request.json['token']
+    tok_check = check_token(token)
+    if not tok_check[0]:
+        return tok_check[1]
+
+    from ESSBackend.models import EntertainmentUsage
+
+    entertainment: EntertainmentUsage = EntertainmentUsage.query.filter_by(
+        email=request.json['token']['email'],
+        date=request.json['metadata']['timestamp'],  # TODO: timestamp equality
+    ).first()
+
+    if entertainment:
+        entertainment.hours = request.json['content']['hours']
+        db.session.commit()
+        return make_response(
+            jsonify({
+                'result': True,
+                'message': 'Updated existing entertainment entry.'
+            })
+        )
+    else:
+        newEntertainment: EntertainmentUsage = EntertainmentUsage(
+            email=request.json['token']['email'],
+            date=request.json['metadata']['timestamp'],
+            hours=request.json['content']['hours'],
+        )
+        db.session.add(newShower)
+        db.session.commit()
+        return make_response(
+            jsonify({
+                'result': True,
+                'message': 'Inserted new entertainment entry.'
+            })
+        )
+
+
+# ----- Health Functions
+@app.route('/api/health', methods=['POST'])
+def getHealth():
+    requirements = [
+        ('date', []),
+        ('token', ['hash', 'expiry', 'email']),
+    ]
+
+    req_check = check_requirements(requirements, request)
+    if not req_check[0]:
+        return req_check[1]
+
+    token: Token = request.json['token']
+    tok_check = check_token(token)
+    if not tok_check[0]:
+        return tok_check[1]
+
+    from ESSBackend.models import Health
+
+    health = Health.query.filter(
+        db.cast(Health.date, db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
+        Health.email == request.json['token']['email']
+    ).first()
+
+    if health:
+        healthContent = {'cigarettes': health.cigarettes}
+    else:
+        healthContent = {'cigarettes': 0}
+
+    return make_response(
+        jsonify(
+            {
+                'result': True,
+                'message': f"Returning health  for {request.json['date']}",
+                'content': healthContent
+            }
+        )
+    )
+
+
+@app.route('/api/health/new', methods=['POST'])
+def postHealth():
+    requirements = [
+        ('content', ['cigarettes']),
+        ('metadata', ['timestamp']),
+        ('token', ['hash', 'expiry', 'email']),
+    ]
+
+    req_check = check_requirements(requirements, request)
+    if not req_check[0]:
+        return req_check[1]
+
+    token: Token = request.json['token']
+    tok_check = check_token(token)
+    if not tok_check[0]:
+        return tok_check[1]
+
+    from ESSBackend.models import Health
+
+    health: Health = Health.query.filter_by(
+        email=request.json['token']['email'],
+        date=request.json['metadata']['timestamp'],  # TODO: timestamp equality
+    ).first()
+
+    if health:
+        health.cigarettes = request.json['content']['cigarettes']
+        db.session.commit()
+        return make_response(jsonify({'result': True, 'message': 'Updated existing health entry.'}))
+    else:
+        newHealth: Health = Health(
+            email=request.json['token']['email'],
+            date=request.json['metadata']['timestamp'],
+            cigarettes=request.json['content']['cigarettes'],
+        )
+        db.session.add(newShower)
+        db.session.commit()
+        return make_response(jsonify({'result': True, 'message': 'Inserted new health entry.'}))
+
+
 # ----- Utility Functions
 
 
@@ -353,7 +694,8 @@ def check_requirements(requirements: List[str], request):
     for req in requirements:
         if req[0] not in request.json:
             return (
-                False, make_response(
+                False,
+                make_response(
                     jsonify({
                         'result': False,
                         'message': f'Missing required field: {req}'

@@ -3,8 +3,7 @@
 from distutils.core import setup
 
 PYTHON_MODULES = [
-    'ESSBackend', 'ESSBackend.app', 'ESSBackend.config', 'ESSBackend.init',
-    'ESSBackend.models'
+    'ESSBackend', 'ESSBackend.app', 'ESSBackend.config', 'ESSBackend.dbinit', 'ESSBackend.models'
 ]
 
 setup(

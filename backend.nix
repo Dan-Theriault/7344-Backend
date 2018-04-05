@@ -11,36 +11,22 @@
   monolith = 
     { config, pkgs, ... }:
     let
-      ESSBackend = pkgs.python3Packages.buildPythonApplication rec {
+      ESSBackend = pkgs.python3Packages.buildPythonPackage rec {
         pname = "ESSBackend";
-        version = "0.1.1";
+        version = "2.0beta";
         name = "${pname}-${version}";
-        src = builtins.fetchGit {
-          # url="git@github.com:Dan-Theriault/7344-Backend.git"; 
-          url= ./.;
-        };
-        buildInputs = with pkgs.python3Packages; [
-          bcrypt
-          flask
-          flask_sqlalchemy
-          flask_migrate
-          psycopg2
-        ];
+        src = ./.;
+        # src = builtins.fetchGit {
+        #   # url="git@github.com:Dan-Theriault/7344-Backend.git"; 
+        #   url= ./.;
+        # };
         doCheck = false;
+        # postFixup = "";
       };
-      myPython = pkgs.python3Full.buildEnv.override rec {
-        extraLibs = with pkgs.python3Packages; [
-          bcrypt
-          flask
-          flask_migrate
-          flask_sqlalchemy
-          psycopg2
-          sqlalchemy
+      myPython = pkgs.python3.buildEnv.override rec {
+        extraLibs = [ pkgs.uwsgi ];
+      };
 
-          ESSBackend
-        ] ++ [ pkgs.uwsgi ];
-      };
-      pg = config.services.postgresql;
       database_name = "ess_prod";
       database_user = "uwsgi";
     in
@@ -97,13 +83,13 @@
              # https://uwsgi-docs.readthedocs.io/en/latest/WSGIquickstart.html
              # I think this section is literally translated to a wsgi.ini file
               type = "normal";
-              pythonPackages = self: with self; [
-                bcrypt
-                flask
-                flask_migrate
-                flask_sqlalchemy
-                psycopg2
-                sqlalchemy
+              pythonPackages = self: [
+                self.bcrypt
+                self.flask
+                self.flask_migrate
+                self.flask_sqlalchemy
+                self.psycopg2
+                self.sqlalchemy
                 ESSBackend
               ];
               chdir = "${ESSBackend}/lib/python3.6/site-packages/ESSBackend/";
@@ -118,7 +104,20 @@
       };
 
       environment = {
-        systemPackages = [ myPython ];
+        systemPackages = [ 
+          ( myPython.withPackages ( ps: [
+            ps.bcrypt
+            ps.flask
+            ps.flask_migrate
+            ps.flask_sqlalchemy
+            ps.psycopg2
+            ps.sqlalchemy
+            ESSBackend
+          ] ) )
+        ];
+
+
+
         variables = { DATABASE_URI = "postgresql+psycopg2:///${database_name}"; };
       };
       systemd.globalEnvironment = { DATABASE_URI = "postgresql+psycopg2:///${database_name}"; };
@@ -128,7 +127,8 @@
 
         serviceConfig = {
           Type = "oneshot";
-          ExecStart = "${myPython}/bin/python ${ESSBackend}/lib/python3.6/site-packages/ESSBackend/init.py";
+          ExecStart = "/run/current-system/sw/bin/python ${ESSBackend}/lib/python3.6/site-packages/ESSBackend/dbinit.py";
+          User = "${database_user}";
         };
         before = [ "uwsgi.service" ];
         wantedBy = [ "multi-user.target" ];

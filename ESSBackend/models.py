@@ -86,6 +86,64 @@ class Commute(db.Model):
         return f'<Commute: {self.method} by {self.email} ({self.arrival})'
 
 
+class WaterCups(db.Model):
+    email = db.Column(db.ForeignKey(AppUser.email), primary_key=True)
+    date = db.Column(db.Date, primary_key=True)
+    count = db.Column(db.Integer, nullable=False)
+
+    def __init__(self, email, date, count=0):
+        self.email = email
+        self.date = date
+        self.count = count
+
+    def __repr__(self):
+        return f'<WaterCups: {self.email} drank {self.count} ({self.date})>'
+
+
+class ShowerUsage(db.Model):
+    email = db.Column(db.ForeignKey(AppUser.email), primary_key=True)
+    date = db.Column(db.Date, primary_key=True)
+    minutes = db.Column(db.Integer, nullable=False)
+    cold = db.Column(db.Boolean, nullable=False)
+
+    def __init__(self, email, date, minutes, cold=False):
+        self.email = email
+        self.date = date
+        self.minutes = minutes
+        self.cold = cold
+
+    def __repr__(self):
+        return f'<ShowerUsage: {self.email} for {self.minutes} ({self.date})>'
+
+
+class EntertainmentUsage(db.Model):
+    email = db.Column(db.ForeignKey(AppUser.email), primary_key=True)
+    date = db.Column(db.Date, primary_key=True)
+    hours = db.Column(db.Integer, nullable=False)
+
+    def __init__(self, email, date, hours):
+        self.email = email
+        self.date = date
+        self.hours = hours
+
+    def __repr__(self):
+        return f'<EntertainmentUsage: {self.email} for {self.hours} ({self.date})>'
+
+
+class Health(db.Model):
+    email = db.Column(db.ForeignKey(AppUser.email), primary_key=True)
+    date = db.Column(db.Date, primary_key=True)
+    cigarettes = db.Column(db.Integer, default=0)
+
+    def __init__(self, email, date, cigarettes):
+        self.email = email
+        self.date = date
+        self.cigarettes = cigarettes
+
+    def __repr__(self):
+        return f'<Health: {self.email} smoked {self.cigarettes} ({self.date})>'
+
+
 # class JournalAttachment(db.Model()):
 #     path = db.Column(db.String(256), primary_key=True)
 #     pass
