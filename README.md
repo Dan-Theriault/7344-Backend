@@ -4,56 +4,42 @@
 
 This backend is structured as a RESTful API that receives and sends JSON objects.
 
-*register:*
-```
-curl https://ess.dtheriault.com/api/register -L -H "Content-Type: application/json" -d
-'{"email":"test2","password":"password"}'
-```
-```
-{
-  "Status": "User Successfully Registered"
-}
-```
-
-*login:*
-```
-curl https://ess.dtheriault.com/api/login -L -H "Content-Type: application/json" -d '{"
-email":"test2","password":"password"}'
-```
-```
-{
-  "created": "Sun, 28 Jan 2018 06:25:38 GMT",
-  "email": "test2",
-  "token": "f13727d997239510862167abddb5017f15eb17bfcf60a0a397c0b1d55d2be2f4"
-}
-```
-
-*logout:*
-Logout has been deprecated.
-Token auth actually allows for the server to be _stateless_.
-Whether you're logged in or not is a property of whether you hold a valid token.
-This property is desirable because it simplifies API logic, while retaining security guarantees.
-
 ## Deployment
 
-In the event I am hit by a bus or otherwise incapacitated, you may need to re-deploy this yourselves.
+Currently, the backend is deployed on the smallest available DigitalOcean droplet tier.
+This droplet is sized for testing purposes only,
+and will no longer be available after May 31st.
 
-1. Install the nix package manager on a Mac or Linux device.
-2. Install NixOps (the deployment tool I used).
-3. Add an entry "ssh-config-file" to the NIX_PATH env variable, pointing to a file with contents:
-    ```
-    Host github.com
-      IdentityFile /etc/deploy/id_rsa
-      StrictHostKeyChecking=no
-    ```
-4. Generate an SSH key at /etc/deploy/id_rsa and authorize it as a deployment key on this GitHub Repo
-5. Setup a Digital Ocean account, and store an auth token in the environment variable DIGITAL_OCEAN_AUTH_TOKEN
-6. Edit backend.nix to use a different domain for dynamic dns (since you don't have my key).
-7. `nixops create -d design-prod backend.nix backend-digitalocean.nix`
-8. `nixops deploy -d design-prod`
 
-The last step may occasionally fail (automated access to private git repositories is finicky). Re-run once or twice before assuming it's broken. 
+There are two possible approaches for a production deployment.
+First, you could simply take the Flask application we developed and arrange your own architecture.
+Some environment variables must be set for the application to function.
+`ESS_DATABASE_URI` must be the URI for a valid PostgreSQL database to which the user running our app has full access.
+`ESS_SECRET` should be a 256 character random string; it is used as the secret salt for authentication tokens.
 
-An ACME/LetsEncrypt error likely means the deployment host is not publicly reachable.
+Second, you can use the NixOps automated deployment configuration included in this repository.
+This automated configuration will set up the backend application, 
+as well as a number of services which make it more performant, secure, and convenient.
+We define the Server OS configuration in `backend.nix`,
+and our cloud infrastructure configuration in `backend-digitalOcean.nix`.
+Together, these two configuration files define our total infrastructure.
+
+The values of some fields do need to be changed;
+for instance, the server will currently attempt to use our testing domain name.
+As this domain is not specific to this project,
+we are not providing credentials for its use -- you will need to acquire a domain name for this project.
+Please read the comments in `backend.nix` for more information.
+
+After making any needed changes, you can deploy this configuration by following these instructions:
+
+1. Install [the nix package manager](https://nixos.org/nix/) on a Mac or Linux device.
+2. Using nix, install NixOps; `nix-env --install nixops`
+3. If you are choosing to use our `backend-digitalocean.nix` or any other DigitalOcean-hosted configuration, [create a DigitalOcean account](https://www.digitalocean.com) and [follow these instructions to request an auth token](https://www.digitalocean.com/community/tutorials/how-to-use-the-digitalocean-api-v2). Store the token in the environment variable `DIGITAL_OCEAN_AUTH_TOKEN`.
+4. Deploy the configuration by running `nixops create -d design-prod backend.nix backend-digitalocean.nix` and then `nixops deploy -d design-prod`.
+
+Please also note that:
+- A test suite against the API is included in our mobile application's code. If the server deployed successfully, all tests should pass.
+- You can remotely access this server (from the machine you deployed from) by running `nixops ssh -d design-prod monolith`.
+
 
 
