@@ -34,11 +34,7 @@ After making any needed changes, you can deploy this configuration by following 
 
 1. Install [the nix package manager](https://nixos.org/nix/) on a Mac or Linux device.
 2. Using nix, install NixOps; `nix-env --install nixops`
-<<<<<<< HEAD
 3. If you are choosing to use our `backend-digitalocean.nix` or any other DigitalOcean-hosted configuration, [create a DigitalOcean account](https://www.digitalocean.com) and [follow these instructions to request an auth token](https://www.digitalocean.com/community/tutorials/how-to-use-the-digitalocean-api-v2). Store the token in the environment variable `DIGITAL_OCEAN_AUTH_TOKEN`.
-=======
-3. If you are choosing to use our `backend-digitalocean.nix` or any other DigitalOcean-hosted configuration, [create a DigitalOcean account] and [follow these instructions to request an auth token](https://www.digitalocean.com/community/tutorials/how-to-use-the-digitalocean-api-v2). Store the token in the environment variable `DIGITAL_OCEAN_AUTH_TOKEN`.
->>>>>>> 94ccbb206406d9f276ad6fd2ab628820bd5982a9
 4. Deploy the configuration by running `nixops create -d design-prod backend.nix backend-digitalocean.nix` and then `nixops deploy -d design-prod`.
 
 Please also note that:
