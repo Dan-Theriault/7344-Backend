@@ -1,25 +1,22 @@
 # AUTHOR: Daniel Theriault
 # This is a NixOps configuration file.
-# It specifies a server configuration, which NixOps can then deploy to arbitrary backends (physical hosts, VMs, AWS instances, etc.)
-
+# Specifies a server configuration, which NixOps can then deploy to arbitrary backends (physical hosts, VMs, AWS instances, etc.)
 
 {
   network.description = "Backend network for Georgia Tech CS Capstone Project";
 
-  # Securing the database is easier if its not exposed over the network
-  # So, until performance requires otherwise, the backend is a single host
+  # This configuration deploys our backend and all services on a single host.
+  # This configuration will not scale infinitely; it is primarily intended for testing purposes.
+  # I did make every effort to deliver good performance; on a sufficiently powerful server, this configuration should server well.
   monolith = 
     { config, pkgs, ... }:
     let
+      # This is the actual backend package
       ESSBackend = pkgs.python3Packages.buildPythonPackage rec {
         pname = "ESSBackend";
         version = "2.0beta";
         name = "${pname}-${version}";
         src = ./.;
-        # src = builtins.fetchGit {
-        #   # url="git@github.com:Dan-Theriault/7344-Backend.git"; 
-        #   url= ./.;
-        # };
         doCheck = false;
         # postFixup = "";
       };
@@ -27,12 +24,17 @@
         extraLibs = [ pkgs.uwsgi ];
       };
 
+      # define some variables
       database_name = "ess_prod";
       database_user = "uwsgi";
     in
     {
+      # We chose to use postgres for this backend because it is free, feature-complete, and really fast.
+      # However, we used an ORM, meaning it's trivial to change to another SQL database if you prefer.
       services.postgresql = {
         enable = true;
+        # This creates our database, and authorizes the backend-running user to access it
+        # Providing our backend-running user with the minimum permissions required is good security practice.
         initialScript = builtins.toFile "psql-init.sh" ''
           CREATE ROLE ${database_user} WITH LOGIN;
           CREATE DATABASE ${database_name};
@@ -40,28 +42,39 @@
           \connect ${database_name};
           ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO ${database_user};
         '';
-          # GRANT ALL PRIVILEGES ON ALL TABLES TO ${database_user};
       };
 
+      # ddclient dynamically informs your domain registrar of this server's IP address.
+      # This means you can make this server accessible at a domain name without any manual intervention.
+      # However, you do need to manual change this section from the test domain over to a production domain.
+      # I use namecheap for my personal and test domains;
+      # they're a solid provider, and have good instructions available for dynamic dns.
       services.ddclient = {
         enable = true;
-        domain = "ess.dtheriault.com";
+        # TODO: change to production domain. this can be a normal domain (ex: foo.com), or a subdomain (ex: bar.foo.com)
+        domain = "ess.dtheriault.com";         
         server = "dynamicdns.park-your-domain.com";
         protocol = "namecheap";
         use = "web, web=dynamicdns.park-your-domain.com/getip";
-        username = "dtheriault.com";
-        password = builtins.readFile ./secrets/dyndns;
+        username = "dtheriault.com"; # TODO: your username is your registered domain
+        password = builtins.readFile ./secrets/dyndns; # TODO: put your dyndns password (from your registrar) in this file
       };
 
+      # Port 80 is for http and port 443 is for https
       networking.firewall.allowedTCPPorts = [ 80 443 ];
 
+      # nginx is a http server/proxy.
+      # It handles connections from client devices much more robustly than a bare flask application.
+      # This instance has also been configured to automatically setup SSL,
+      # which encrypts all traffic between this server and client devices.
+      # This is required to provide good security to our users.
       services.nginx = {
         enable = true;
         recommendedTlsSettings = true;
         recommendedOptimisation = true;
         recommendedGzipSettings = true;
         recommendedProxySettings = true;
-        virtualHosts."ess.dtheriault.com" = {
+        virtualHosts."ess.dtheriault.com" = { # TODO: Change this to the production domain name
           enableACME = true;
           forceSSL = true;
           locations."/" = {
@@ -73,6 +86,9 @@
         };
       };
 
+      # Runs the backend application in uwsgi.
+      # uwsgi makes it easier to interface with nginx,
+      # and makes our application much faster by managing multi-processing.
       services.uwsgi = {
         enable = true;
         plugins = [ "python3" ];
@@ -115,13 +131,12 @@
             ESSBackend
           ] ) )
         ];
-
-
-
         variables = { DATABASE_URI = "postgresql+psycopg2:///${database_name}"; };
       };
+
       systemd.globalEnvironment = { DATABASE_URI = "postgresql+psycopg2:///${database_name}"; };
 
+      # This service executes once, at server startup, to set up the database tables required for our application.
       systemd.services.ESSBackendInit = {
         description = "Initializes the database tables needed by ESSBackend.";
 
