@@ -1,5 +1,3 @@
-import ESSBackend.models
-from ESSBackend.app import db
+from ESSBackend.app import db_init
 
-db.create_all()
-db.session.commit()
+db_init()

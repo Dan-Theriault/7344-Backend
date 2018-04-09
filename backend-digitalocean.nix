@@ -6,7 +6,9 @@
     {
       # Other options include AWS, Hetzner, Azure, Google.
       deployment.targetEnv = "digitalOcean";
+
       deployment.digitalOcean.region = "nyc3";
+
       # Current size is the basic, $5 / month tier.
       # It has 1GB of memory and 1 virutal cpu.
       # The next most powerful sizes are:

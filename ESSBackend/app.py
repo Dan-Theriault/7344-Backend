@@ -2,11 +2,37 @@
 # Guided by several online resources:
 # - https://blog.miguelgrinberg.com/post/designing-a-restful-api-with-python-and-flask
 
-from bcrypt import checkpw, hashpw, gensalt
+# Comments Post-Review RE: Code Review
+#
+# Several of the reported issues are #WONTFIX.
+# In particular, some typographic concerns did not respect PEP8,
+# the official python style guide.
+# This project is auto-formatted with YAPF to follow PEP8
+# (with maximum line length increased to 100 chars)
+#
+# 1. "breaking convention of spacing for jsonify":
+#    This project's convention is to split lines past 100 characters.
+# 2. "Sometimes CamelCase, sometimes underscore_separate"
+#    PEP8 indicates that classes should follow CamelCase.
+#    Functions and variables should follow underscore_separate.
+# 3. "no spaces before or after ="
+#    This is done inside function calls,
+#    and differentiaties from normal variable assignment.
+#
+# One functional concern was also unfounded:
+# 1. "ignore db response when returning result"
+#    Result does not consider whether any content was found,
+#    only whether the operation was successful.
+#    Finding no content is still a successful operation; no error occurs.
+
 from ESSBackend.config import Config
+from bcrypt import checkpw, hashpw, gensalt
 from datetime import datetime
 from flask import Flask, jsonify, make_response, request
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import create_engine, cast, Date
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import scoped_session, sessionmaker
 from typing import NamedTuple, List, Dict
 
 import hashlib
@@ -14,7 +40,22 @@ import hashlib
 app = Flask(__name__)
 app.config.from_object(Config)
 
-db = SQLAlchemy(app)
+engine = create_engine(Config.SQLALCHEMY_DATABASE_URI, convert_unicode=True)
+db = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
+
+Base = declarative_base()
+Base.query = db.query_property()
+
+
+def db_init():
+    import ESSBackend.models
+    Base.metadata.create_all(bind=engine)
+
+
+# Called after all API responses
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    db.remove()
 
 
 @app.route('/api/login', methods=['POST'])
@@ -49,11 +90,11 @@ def register():
         return make_response(jsonify({'result': False, 'message': 'User already exists'}))
 
     pwhash = (hashpw(request.json['password'].encode('utf-8'), gensalt())).decode('utf-8')
-    newUser: AppUser = AppUser(password_hash=pwhash, email=request.json['email'])
-    db.session.add(newUser)
-    db.session.commit()
+    new_user: AppUser = AppUser(password_hash=pwhash, email=request.json['email'])
+    db.add(new_user)
+    db.commit()
 
-    return return_token(newUser.email)
+    return return_token(new_user.email)
 
 
 @app.route('/api/status', methods=['GET'])
@@ -65,7 +106,7 @@ def status():
 
 
 @app.route('/api/food', methods=['POST'])
-def getFood():
+def get_food():
     requirements = [
         ('date', []),
         ('token', ['hash', 'expiry', 'email']),
@@ -83,7 +124,7 @@ def getFood():
     from ESSBackend.models import Food
 
     foods = Food.query.filter(
-        db.cast(Food.mealTime, db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
+        cast(Food.mealTime, Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
         Food.email == request.json['token']['email']
     ).all()
 
@@ -110,7 +151,7 @@ def getFood():
 
 
 @app.route('/api/food/new', methods=['POST'])
-def postFood():
+def post_food():
     requirements = [
         ('content', ['name', 'quantity', 'quantityUnits', 'calories', 'category', 'mealTime']),
         ('metadata', ['timestamp']),
@@ -137,10 +178,10 @@ def postFood():
         food.quantityUnits = request.json['content']['quantityUnits']
         food.calories = request.json['content']['calories']
         food.category = request.json['content']['category']
-        db.session.commit()
+        db.commit()
         return make_response(jsonify({'result': True, 'message': 'Updated existing food.'}))
     else:
-        newFood: Food = Food(
+        new_food: Food = Food(
             email=request.json['token']['email'],
             name=request.json['content']['name'],
             mealTime=request.json['content']['mealTime'],
@@ -149,8 +190,8 @@ def postFood():
             calories=request.json['content']['calories'],
             category=request.json['content']['category']
         )
-        db.session.add(newFood)
-        db.session.commit()
+        db.add(new_food)
+        db.commit()
         return make_response(jsonify({'result': True, 'message': 'Inserted new food.'}))
 
 
@@ -158,7 +199,7 @@ def postFood():
 
 
 @app.route('/api/commute', methods=['POST'])
-def getCommute():
+def get_commute():
     requirements = [
         ('date', []),
         ('token', ['hash', 'expiry', 'email']),
@@ -176,7 +217,7 @@ def getCommute():
     from ESSBackend.models import Commute
 
     commutes = Commute.query.filter(
-        db.cast(Commute.arrival, db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
+        cast(Commute.arrival, Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
         Commute.email == request.json['token']['email']
     ).all()
 
@@ -184,8 +225,8 @@ def getCommute():
         {
             'method': commute.method,
             'distance': commute.distance,
-            'departure': commute.departure.isoformat(),
-            'arrival': commute.arrival.isoformat(),
+            'departure': commute.departure,
+            'arrival': commute.arrival,
         } for commute in commutes
     ]
 
@@ -201,7 +242,7 @@ def getCommute():
 
 
 @app.route('/api/commute/new', methods=['POST'])
-def postCommute():
+def post_commute():
     requirements = [
         ('content', ['arrival', 'departure', 'method', 'distance']),
         ('metadata', ['timestamp']),
@@ -229,18 +270,18 @@ def postCommute():
         commute.departure = request.json['content']['departure']
         commute.method = request.json['content']['method']
         commute.distance = request.json['content']['distance']
-        db.session.commit()
+        db.commit()
         return make_response(jsonify({'result': True, 'message': 'Updated existing commute.'}))
     else:
-        newCommute: Commute = Commute(
+        new_commute: Commute = Commute(
             email=request.json['token']['email'],
             arrival=request.json['content']['arrival'],
             departure=request.json['content']['departure'],
             method=request.json['content']['method'],
             distance=request.json['content']['distance']
         )
-        db.session.add(newCommute)
-        db.session.commit()
+        db.add(new_commute)
+        db.commit()
         return make_response(jsonify({'result': True, 'message': 'Inserted new commute.'}))
 
 
@@ -248,7 +289,7 @@ def postCommute():
 
 
 @app.route('/api/journal', methods=['POST'])
-def getJournal():
+def get_journal():
     requirements = [
         ('date', []),
         ('token', ['hash', 'expiry', 'email']),
@@ -266,8 +307,7 @@ def getJournal():
     from ESSBackend.models import JournalEntry
 
     journals = JournalEntry.query.filter(
-        db.cast(JournalEntry.created,
-                db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
+        cast(JournalEntry.created, Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
         JournalEntry.email == request.json['token']['email']
     ).all()
 
@@ -292,7 +332,7 @@ def getJournal():
 
 
 @app.route('/api/journal/new', methods=['POST'])
-def postJournal():
+def post_journal():
     requirements = [
         ('content', ['title', 'contents']),
         ('metadata', ['timestamp']),
@@ -318,7 +358,7 @@ def postJournal():
     if journal:
         journal.content = request.json['content']['contents']
         journal.edited = request.json['metadata']['timestamp']
-        db.session.commit()
+        db.commit()
         return make_response(
             jsonify({
                 'result': True,
@@ -326,20 +366,20 @@ def postJournal():
             })
         )
     else:
-        newJournal: JournalEntry = JournalEntry(
+        new_journal: JournalEntry = JournalEntry(
             email=request.json['token']['email'],
             created=request.json['metadata']['timestamp'],
             title=request.json['content']['title'],
             content=request.json['content']['contents']
         )
-        db.session.add(newJournal)
-        db.session.commit()
+        db.add(new_journal)
+        db.commit()
         return make_response(jsonify({'result': True, 'message': 'Inserted new journal entry.'}))
 
 
 # ----- Water Functions
 @app.route('/api/water', methods=['POST'])
-def getWater():
+def get_water():
     requirements = [
         ('date', []),
         ('token', ['hash', 'expiry', 'email']),
@@ -357,7 +397,7 @@ def getWater():
     from ESSBackend.models import WaterCups
 
     water = WaterCups.query.filter(
-        db.cast(WaterCups.date, db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
+        cast(WaterCups.date, Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
         WaterCups.email == request.json['token']['email']
     ).first()
 
@@ -378,7 +418,7 @@ def getWater():
 
 
 @app.route('/api/water/new', methods=['POST'])
-def postWater():
+def post_water():
     requirements = [
         ('content', ['isIncrement', 'cups']),
         ('metadata', ['timestamp']),
@@ -406,22 +446,22 @@ def postWater():
             water.count += request.json['content']['cups']
         else:
             water.count = request.json['content']['cups']
-        db.session.commit()
+        db.commit()
         return make_response(jsonify({'result': True, 'message': 'Updated existing water entry.'}))
     else:
-        newWater: WaterCups = WaterCups(
+        new_water: WaterCups = WaterCups(
             email=request.json['token']['email'],
             date=request.json['metadata']['timestamp'],
             count=request.json['content']['cups']
         )
-        db.session.add(newWater)
-        db.session.commit()
+        db.add(new_water)
+        db.commit()
         return make_response(jsonify({'result': True, 'message': 'Inserted new water entry.'}))
 
 
 # ----- Shower Functions
 @app.route('/api/showers', methods=['POST'])
-def getShower():
+def get_shower():
     requirements = [
         ('date', []),
         ('token', ['hash', 'expiry', 'email']),
@@ -439,7 +479,7 @@ def getShower():
     from ESSBackend.models import ShowerUsage
 
     shower = ShowerUsage.query.filter(
-        db.cast(ShowerUsage.date, db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
+        cast(ShowerUsage.date, Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
         ShowerUsage.email == request.json['token']['email']
     ).first()
 
@@ -460,7 +500,7 @@ def getShower():
 
 
 @app.route('/api/showers/new', methods=['POST'])
-def postShower():
+def post_shower():
     requirements = [
         ('content', ['cold', 'minutes']),
         ('metadata', ['timestamp']),
@@ -486,23 +526,23 @@ def postShower():
     if shower:
         shower.minutes = request.json['content']['minutes']
         shower.cold = request.json['content']['cold']
-        db.session.commit()
+        db.commit()
         return make_response(jsonify({'result': True, 'message': 'Updated existing shower entry.'}))
     else:
-        newShower: ShowerUsage = ShowerUsage(
+        new_shower: ShowerUsage = ShowerUsage(
             email=request.json['token']['email'],
             date=request.json['metadata']['timestamp'],
             minutes=request.json['content']['minutes'],
             cold=request.json['content']['cold']
         )
-        db.session.add(newShower)
-        db.session.commit()
+        db.add(new_shower)
+        db.commit()
         return make_response(jsonify({'result': True, 'message': 'Inserted new shower entry.'}))
 
 
 # ----- Entertainment Functions
 @app.route('/api/entertainment', methods=['POST'])
-def getEntertainment():
+def get_entertainment():
     requirements = [
         ('date', []),
         ('token', ['hash', 'expiry', 'email']),
@@ -520,8 +560,7 @@ def getEntertainment():
     from ESSBackend.models import EntertainmentUsage
 
     entertainment = EntertainmentUsage.query.filter(
-        db.cast(EntertainmentUsage.date,
-                db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
+        cast(EntertainmentUsage.date, Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
         EntertainmentUsage.email == request.json['token']['email']
     ).first()
 
@@ -542,7 +581,7 @@ def getEntertainment():
 
 
 @app.route('/api/entertainment/new', methods=['POST'])
-def postEntertainment():
+def post_Entertainment():
     requirements = [
         ('content', ['hours']),
         ('metadata', ['timestamp']),
@@ -567,7 +606,7 @@ def postEntertainment():
 
     if entertainment:
         entertainment.hours = request.json['content']['hours']
-        db.session.commit()
+        db.commit()
         return make_response(
             jsonify({
                 'result': True,
@@ -575,13 +614,13 @@ def postEntertainment():
             })
         )
     else:
-        newEntertainment: EntertainmentUsage = EntertainmentUsage(
+        new_entertainment: EntertainmentUsage = EntertainmentUsage(
             email=request.json['token']['email'],
             date=request.json['metadata']['timestamp'],
             hours=request.json['content']['hours'],
         )
-        db.session.add(newShower)
-        db.session.commit()
+        db.add(new_entertainment)
+        db.commit()
         return make_response(
             jsonify({
                 'result': True,
@@ -592,7 +631,7 @@ def postEntertainment():
 
 # ----- Health Functions
 @app.route('/api/health', methods=['POST'])
-def getHealth():
+def get_health():
     requirements = [
         ('date', []),
         ('token', ['hash', 'expiry', 'email']),
@@ -610,7 +649,7 @@ def getHealth():
     from ESSBackend.models import Health
 
     health = Health.query.filter(
-        db.cast(Health.date, db.Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
+        cast(Health.date, Date) == datetime.strptime(request.json['date'], "%Y-%m-%d"),
         Health.email == request.json['token']['email']
     ).first()
 
@@ -631,7 +670,7 @@ def getHealth():
 
 
 @app.route('/api/health/new', methods=['POST'])
-def postHealth():
+def post_health():
     requirements = [
         ('content', ['cigarettes']),
         ('metadata', ['timestamp']),
@@ -656,16 +695,16 @@ def postHealth():
 
     if health:
         health.cigarettes = request.json['content']['cigarettes']
-        db.session.commit()
+        db.commit()
         return make_response(jsonify({'result': True, 'message': 'Updated existing health entry.'}))
     else:
-        newHealth: Health = Health(
+        new_health: Health = Health(
             email=request.json['token']['email'],
             date=request.json['metadata']['timestamp'],
             cigarettes=request.json['content']['cigarettes'],
         )
-        db.session.add(newShower)
-        db.session.commit()
+        db.add(new_health)
+        db.commit()
         return make_response(jsonify({'result': True, 'message': 'Inserted new health entry.'}))
 
 
@@ -674,15 +713,15 @@ def postHealth():
 
 def check_token(token: Dict[str, str]):
     # TODO: Token expiry
-    newHash = hashlib.sha256(
+    new_hash = hashlib.sha256(
         (token['expiry'] + token['email'] + app.config['SECRET_KEY']).encode('utf-8')
     ).hexdigest()
 
     return (
-        token['hash'] == newHash,
+        token['hash'] == new_hash,
         make_response(jsonify({
             'result': False,
-            'message': f'Invalid Token Hash: {newHash}'
+            'message': f'Invalid Token Hash: {new_hash}'
         }))
     )
 
