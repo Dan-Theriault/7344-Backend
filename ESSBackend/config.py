@@ -7,8 +7,8 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 class Config(object):
     DEBUG = True
-    SECRET_KEY = "Not actually a secret ;_;"
     SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URI']
+    SECRET_KEY = os.environ['ESS_SECRET']
     TOKEN_TIMEOUT = "???"  # set this to a timedelta
 
     # significant performance impact & not needed

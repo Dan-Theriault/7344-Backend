@@ -27,10 +27,16 @@
       # define some variables
       database_name = "ess_prod";
       database_user = "uwsgi";
+      secret = builtins.readFile ./secrets/ess.txt; #TODO: create this file. 256-char random str.
+
+      envvars = { 
+        DATABASE_URI = "'postgresql+psycopg2:///${database_name}'"; 
+        ESS_SECRET = "'${secret}'";
+      };
     in
     {
       # We chose to use postgres for this backend because it is free, feature-complete, and really fast.
-      # However, we used an ORM, meaning it's trivial to change to another SQL database if you prefer.
+      # However, we used an ORM, meaning it's possible to change to another SQL database if you prefer.
       services.postgresql = {
         enable = true;
         # This creates our database, and authorizes the backend-running user to access it
@@ -51,13 +57,14 @@
       # they're a solid provider, and have good instructions available for dynamic dns.
       services.ddclient = {
         enable = true;
-        # TODO: change to production domain. this can be a normal domain (ex: foo.com), or a subdomain (ex: bar.foo.com)
+        # TODO: change to production domain. 
         domain = "ess.dtheriault.com";         
         server = "dynamicdns.park-your-domain.com";
         protocol = "namecheap";
         use = "web, web=dynamicdns.park-your-domain.com/getip";
         username = "dtheriault.com"; # TODO: your username is your registered domain
-        password = builtins.readFile ./secrets/dyndns; # TODO: put your dyndns password (from your registrar) in this file
+        # TODO: put your dyndns password (from your registrar) in this file
+        password = builtins.readFile ./secrets/dyndns.txt; 
       };
 
       # Port 80 is for http and port 443 is for https
@@ -131,20 +138,21 @@
             ESSBackend
           ] ) )
         ];
-        variables = { DATABASE_URI = "postgresql+psycopg2:///${database_name}"; };
+        variables = envvars; 
       };
 
-      systemd.globalEnvironment = { DATABASE_URI = "postgresql+psycopg2:///${database_name}"; };
+      systemd.globalEnvironment = envvars;
 
       # This service executes once, at server startup, to set up the database tables required for our application.
       systemd.services.ESSBackendInit = {
-        description = "Initializes the database tables needed by ESSBackend.";
-
         serviceConfig = {
           Type = "oneshot";
           ExecStart = "/run/current-system/sw/bin/python ${ESSBackend}/lib/python3.6/site-packages/ESSBackend/dbinit.py";
+          ExecStartPre = "export ESS_SECRET '${secret}'";
           User = "${database_user}";
         };
+        description = "Initializes the database tables needed by ESSBackend.";
+        environment = envvars;
         before = [ "uwsgi.service" ];
         wantedBy = [ "multi-user.target" ];
         after = [ "postgresql.service" ];
