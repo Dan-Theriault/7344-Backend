@@ -30,7 +30,7 @@
       secret = builtins.readFile ./secrets/ess.txt; #TODO: create this file. 256-char random str.
 
       envvars = { 
-        DATABASE_URI = "'postgresql+psycopg2:///${database_name}'"; 
+        DATABASE_URI = "postgresql+psycopg2:///${database_name}"; 
         ESS_SECRET = "'${secret}'";
       };
     in
@@ -121,6 +121,7 @@
               # module = "ESSBackend.wsgi";
               socket = "/run/uwsgi/ESSBackend.sock";
               chmod-socket = "666";
+              env = [ "ESS_SECRET=${secret}" ];
             };
           };
         };
